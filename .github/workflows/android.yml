@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Kyw3ll Studio APK
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,7 @@ jobs:
       - name: Install Android platform
         run: npx cap add android
 
-      - name: Copy web application
+      - name: Copy Kyw3ll Studio
         run: npx cap copy android
 
       - name: Add microphone permissions
@@ -37,11 +37,23 @@ jobs:
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
 
-          sed -i '/<manifest/a\
-          <uses-permission android:name="android.permission.RECORD_AUDIO" />\
-          <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST"
+          python3 - <<'PY'
+          from pathlib import Path
 
-      - name: Build Debug APK
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          permissions = """    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+          """
+
+          if "android.permission.RECORD_AUDIO" not in s:
+              s = s.replace("<application", permissions + "\n    <application", 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Build APK
         working-directory: android
         run: |
           chmod +x gradlew
