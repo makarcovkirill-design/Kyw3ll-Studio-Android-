@@ -18,15 +18,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check versions
+        run: |
+          node --version
+          npm --version
+          java -version
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install Android platform
+      - name: Check Capacitor
+        run: npx cap --version
+
+      - name: Create Android project
         run: npx cap add android
 
       - name: Copy Kyw3ll Studio
@@ -35,29 +50,44 @@ jobs:
       - name: Add microphone permissions
         shell: bash
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
 
-          permissions = """    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-          """
+          permissions = [
+              '    <uses-permission android:name="android.permission.RECORD_AUDIO" />',
+              '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'
+          ]
 
-          if "android.permission.RECORD_AUDIO" not in s:
-              s = s.replace("<application", permissions + "\n    <application", 1)
+          for permission in permissions:
+              if permission not in text:
+                  text = text.replace(
+                      "<application",
+                      permission + "\n    <application",
+                      1
+                  )
 
-          p.write_text(s)
+          manifest.write_text(text)
           PY
+
+      - name: Verify web files
+        run: |
+          test -f www/index.html
+          echo "Kyw3ll Studio index.html found"
+          ls -lh www/index.html
 
       - name: Build APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Check APK
+        run: |
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
