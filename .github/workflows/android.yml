@@ -1,4 +1,3 @@
-
 name: Build Kyw3ll Studio APK
 
 on:
@@ -7,58 +6,50 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-        
+
       - name: Install dependencies
         run: npm install
 
-      - name: Create Android project
+      - name: Install Android platform
         run: npx cap add android
 
-      - name: Copy Kyw3ll Studio
+      - name: Copy web application
         run: npx cap copy android
 
       - name: Add microphone permissions
+        shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
 
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
+          sed -i '/<manifest/a\
+          <uses-permission android:name="android.permission.RECORD_AUDIO" />\
+          <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST"
 
-          permissions = [
-              '    <uses-permission android:name="android.permission.RECORD_AUDIO" />',
-              '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'
-          ]
-
-          marker = '<application'
-          additions = '\n'.join(permissions) + '\n\n'
-
-          if 'android.permission.RECORD_AUDIO' not in s:
-              s = s.replace(marker, additions + marker, 1)
-
-          p.write_text(s)
-          PY
-
-      - name: Build APK
+      - name: Build Debug APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kyw3ll-Studio-debug-apk
+          name: Kyw3ll-Studio-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
